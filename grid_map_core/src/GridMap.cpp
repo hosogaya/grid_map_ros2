@@ -502,17 +502,84 @@ bool GridMap::move(const Position & position, std::vector<BufferRegion> & newReg
   getPositionShiftFromIndexShift(alignedPositionShift, indexShift, resolution_);
 
   // Delete fields that fall out of map (and become empty cells).
+  if ((Eigen::abs(indexShift) > getSize()).any()) 
+  {
+    // Move to outside region of current map. Drop all data
+    clearAll();
+  }
+  else {
+    // Move to inside region of current map. 
+    Index overlap_index_start_original;
+    Index overlap_index_start_moved;
+    int overlap_index_rows = getSize()(0) - abs(indexShift(0));
+    int overlap_index_cols = getSize()(1) - abs(indexShift(1));
+    int clear_index_row, clear_index_col;
+    int clear_index_row_num = abs(indexShift(0));
+    int clear_index_col_num = abs(indexShift(1));
+    if (indexShift(0) < 0 && indexShift(1) < 0)
+    {
+      // Move to front left
+      overlap_index_start_original.setZero();
+      overlap_index_start_moved = -indexShift;
+      clear_index_row = 0;
+      clear_index_col = 0;
+    }
+    else if (indexShift(0) >= 0 && indexShift(1) >= 0)
+    {
+      // Move to back right
+      overlap_index_start_original = indexShift;
+      overlap_index_start_moved.setZero();
+      clear_index_row = overlap_index_rows;
+      clear_index_col = overlap_index_cols;
+    }
+    else if (indexShift(0) < 0 && indexShift(1) >= 0)
+    {
+      // Move to front right
+      overlap_index_start_original.x() = 0;
+      overlap_index_start_original.y() = indexShift(1);
+      overlap_index_start_moved.x() = -indexShift(0);
+      overlap_index_start_moved.y() = 0;
+      clear_index_row = 0;
+      clear_index_col = overlap_index_cols;
+    }
+    else 
+    {
+      // Move to back left
+      overlap_index_start_original.x() = indexShift(0);
+      overlap_index_start_original.y() = 0;
+      overlap_index_start_moved.x() = 0;
+      overlap_index_start_moved.y() = -indexShift(1);
+      clear_index_row = overlap_index_rows;
+      clear_index_col = 0;
+    }
+
+    for (auto& data : data_)
+    {
+      // const grid_map::Matrix& mat = data.second;
+      auto mat_preserve = data.second.block(overlap_index_start_original.x(), overlap_index_start_original.y(), 
+        overlap_index_rows, overlap_index_cols);
+      auto mat_change = data.second.block(overlap_index_start_moved.x(), overlap_index_start_moved.y(), 
+        overlap_index_rows, overlap_index_cols);
+
+      mat_change = mat_preserve;
+      // clear region not overlaped
+      data.second.block(clear_index_row, 0, clear_index_row_num, getSize()(1)).setConstant(NAN);
+      data.second.block(0, clear_index_col, getSize()(0), clear_index_col_num).setConstant(NAN);
+    }
+
+  }
+
   for (int i = 0; i < indexShift.size(); i++) {
     if (indexShift(i) != 0) {
       if (abs(indexShift(i)) >= getSize()(i)) {
         // Entire map is dropped.
-        clearAll();
+        // clearAll();
         newRegions.push_back(
           BufferRegion(
             Index(0, 0), getSize(),
             BufferRegion::Quadrant::Undefined));
       } else {
-        // Drop cells out of map.
+        // Drop cells out of map. Move data
         int sign = (indexShift(i) > 0 ? 1 : -1);
         int startIndex = startIndex_(i) - (sign < 0 ? 1 : 0);
         int endIndex = startIndex - sign + indexShift(i);
@@ -523,13 +590,13 @@ bool GridMap::move(const Position & position, std::vector<BufferRegion> & newReg
         if (index + nCells <= getSize()(i)) {
           // One region to drop.
           if (i == 0) {
-            clearRows(index, nCells);
+            // clearRows(index, nCells);
             newRegions.push_back(
               BufferRegion(
                 Index(index, 0), Size(nCells, getSize()(1)),
                 BufferRegion::Quadrant::Undefined));
           } else if (i == 1) {
-            clearCols(index, nCells);
+            // clearCols(index, nCells);
             newRegions.push_back(
               BufferRegion(
                 Index(0, index), Size(getSize()(0), nCells),
@@ -540,13 +607,13 @@ bool GridMap::move(const Position & position, std::vector<BufferRegion> & newReg
           int firstIndex = index;
           int firstNCells = getSize()(i) - firstIndex;
           if (i == 0) {
-            clearRows(firstIndex, firstNCells);
+            // clearRows(firstIndex, firstNCells);
             newRegions.push_back(
               BufferRegion(
                 Index(firstIndex, 0), Size(firstNCells, getSize()(1)),
                 BufferRegion::Quadrant::Undefined));
           } else if (i == 1) {
-            clearCols(firstIndex, firstNCells);
+            // clearCols(firstIndex, firstNCells);
             newRegions.push_back(
               BufferRegion(
                 Index(0, firstIndex), Size(getSize()(0), firstNCells),
@@ -556,13 +623,13 @@ bool GridMap::move(const Position & position, std::vector<BufferRegion> & newReg
           int secondIndex = 0;
           int secondNCells = nCells - firstNCells;
           if (i == 0) {
-            clearRows(secondIndex, secondNCells);
+            // clearRows(secondIndex, secondNCells);
             newRegions.push_back(
               BufferRegion(
                 Index(secondIndex, 0),
                 Size(secondNCells, getSize()(1)), BufferRegion::Quadrant::Undefined));
           } else if (i == 1) {
-            clearCols(secondIndex, secondNCells);
+            // clearCols(secondIndex, secondNCells);
             newRegions.push_back(
               BufferRegion(
                 Index(0, secondIndex),
@@ -574,8 +641,9 @@ bool GridMap::move(const Position & position, std::vector<BufferRegion> & newReg
   }
 
   // Update information.
-  startIndex_ += indexShift;
-  wrapIndexToRange(startIndex_, getSize());
+  // startIndex_ += indexShift;
+  startIndex_.setZero();
+  // wrapIndexToRange(startIndex_, getSize());
   position_ += alignedPositionShift;
 
   // Check if map has been moved at all.
