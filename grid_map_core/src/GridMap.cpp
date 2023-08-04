@@ -493,7 +493,7 @@ void GridMap::setPosition(const Position & position)
   position_ = position;
 }
 
-bool GridMap::move(const Position & position, std::vector<BufferRegion> & newRegions)
+bool GridMap::move2(const Position & position)
 {
   Index indexShift;
   Position positionShift = position - position_;
@@ -568,18 +568,34 @@ bool GridMap::move(const Position & position, std::vector<BufferRegion> & newReg
     }
 
   }
+  // Update information.
+  startIndex_.setZero();
+  position_ += alignedPositionShift;
 
+  // Check if map has been moved at all.
+  return indexShift.any() != 0;
+}
+
+bool GridMap::move(const Position& position, std::vector<BufferRegion> & newRegions)
+{
+  Index indexShift;
+  Position positionShift = position - position_;
+  getIndexShiftFromPositionShift(indexShift, positionShift, resolution_);
+  Position alignedPositionShift;
+  getPositionShiftFromIndexShift(alignedPositionShift, indexShift, resolution_);
+
+  // Delete fields that fall out of map (and become empty cells).
   for (int i = 0; i < indexShift.size(); i++) {
     if (indexShift(i) != 0) {
       if (abs(indexShift(i)) >= getSize()(i)) {
         // Entire map is dropped.
-        // clearAll();
+        clearAll();
         newRegions.push_back(
           BufferRegion(
             Index(0, 0), getSize(),
             BufferRegion::Quadrant::Undefined));
       } else {
-        // Drop cells out of map. Move data
+        // Drop cells out of map.
         int sign = (indexShift(i) > 0 ? 1 : -1);
         int startIndex = startIndex_(i) - (sign < 0 ? 1 : 0);
         int endIndex = startIndex - sign + indexShift(i);
@@ -590,13 +606,13 @@ bool GridMap::move(const Position & position, std::vector<BufferRegion> & newReg
         if (index + nCells <= getSize()(i)) {
           // One region to drop.
           if (i == 0) {
-            // clearRows(index, nCells);
+            clearRows(index, nCells);
             newRegions.push_back(
               BufferRegion(
                 Index(index, 0), Size(nCells, getSize()(1)),
                 BufferRegion::Quadrant::Undefined));
           } else if (i == 1) {
-            // clearCols(index, nCells);
+            clearCols(index, nCells);
             newRegions.push_back(
               BufferRegion(
                 Index(0, index), Size(getSize()(0), nCells),
@@ -607,13 +623,13 @@ bool GridMap::move(const Position & position, std::vector<BufferRegion> & newReg
           int firstIndex = index;
           int firstNCells = getSize()(i) - firstIndex;
           if (i == 0) {
-            // clearRows(firstIndex, firstNCells);
+            clearRows(firstIndex, firstNCells);
             newRegions.push_back(
               BufferRegion(
                 Index(firstIndex, 0), Size(firstNCells, getSize()(1)),
                 BufferRegion::Quadrant::Undefined));
           } else if (i == 1) {
-            // clearCols(firstIndex, firstNCells);
+            clearCols(firstIndex, firstNCells);
             newRegions.push_back(
               BufferRegion(
                 Index(0, firstIndex), Size(getSize()(0), firstNCells),
@@ -623,13 +639,13 @@ bool GridMap::move(const Position & position, std::vector<BufferRegion> & newReg
           int secondIndex = 0;
           int secondNCells = nCells - firstNCells;
           if (i == 0) {
-            // clearRows(secondIndex, secondNCells);
+            clearRows(secondIndex, secondNCells);
             newRegions.push_back(
               BufferRegion(
                 Index(secondIndex, 0),
                 Size(secondNCells, getSize()(1)), BufferRegion::Quadrant::Undefined));
           } else if (i == 1) {
-            // clearCols(secondIndex, secondNCells);
+            clearCols(secondIndex, secondNCells);
             newRegions.push_back(
               BufferRegion(
                 Index(0, secondIndex),
@@ -641,9 +657,8 @@ bool GridMap::move(const Position & position, std::vector<BufferRegion> & newReg
   }
 
   // Update information.
-  // startIndex_ += indexShift;
-  startIndex_.setZero();
-  // wrapIndexToRange(startIndex_, getSize());
+  startIndex_ += indexShift;
+  wrapIndexToRange(startIndex_, getSize());
   position_ += alignedPositionShift;
 
   // Check if map has been moved at all.

@@ -354,6 +354,8 @@ public:
    */
   bool move(const Position & position);
 
+  bool move2(const Position & position);
+
   /*!
    * Adds data from an other grid map to this grid map
    * @param other the grid map to take data from.
