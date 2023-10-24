@@ -89,6 +89,15 @@ public:
   static std::unique_ptr<grid_map_msgs::msg::GridMap> toMessage(
     const grid_map::GridMap & gridMap, const std::vector<std::string> & layers);
 
+  static void toMessage(
+    const grid_map::GridMap & gridMap, grid_map_msgs::msg::GridMap& msg
+  );
+  static void toMessage(
+    const grid_map::GridMap & gridMap, const std::vector<std::string> & layers, grid_map_msgs::msg::GridMap& msg
+  );
+
+  
+
   /*!
    * Converts a grid map object to a ROS PointCloud2 message. Set the layer to be transformed
    * as the points of the point cloud with `pointLayer`, all other types will be added as
