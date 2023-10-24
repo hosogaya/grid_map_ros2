@@ -142,6 +142,40 @@ std::unique_ptr<grid_map_msgs::msg::GridMap> GridMapRosConverter::toMessage(
   return message;
 }
 
+void GridMapRosConverter::toMessage(const grid_map::GridMap& map, grid_map_msgs::msg::GridMap& msg)
+{
+  toMessage(map, map.getLayers(), msg);
+}
+
+void GridMapRosConverter::toMessage(const grid_map::GridMap& map, const std::vector<std::string>& layers, grid_map_msgs::msg::GridMap& msg)
+{
+  msg.header.stamp = rclcpp::Time(map.getTimestamp());
+  msg.header.frame_id = map.getFrameId();
+  msg.info.resolution = map.getResolution();
+  msg.info.length_x = map.getLength().x();
+  msg.info.length_y = map.getLength().y();
+  msg.info.pose.position.x = map.getPosition().x();
+  msg.info.pose.position.y = map.getPosition().y();
+  msg.info.pose.position.z = 0.0;
+  msg.info.pose.orientation.x = 0.0;
+  msg.info.pose.orientation.y = 0.0;
+  msg.info.pose.orientation.z = 0.0;
+  msg.info.pose.orientation.w = 1.0;
+
+  msg.layers = layers;
+  msg.basic_layers = map.getBasicLayers();
+
+  msg.data.clear();
+  for (const auto & layer : layers) {
+    std_msgs::msg::Float32MultiArray dataArray;
+    matrixEigenCopyToMultiArrayMessage(map.get(layer), dataArray);
+    msg.data.push_back(dataArray);
+  }
+
+  msg.outer_start_index = map.getStartIndex()(0);
+  msg.inner_start_index = map.getStartIndex()(1);
+}
+
 void GridMapRosConverter::toPointCloud(
   const grid_map::GridMap & gridMap,
   const std::string & pointLayer,
